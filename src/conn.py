@@ -3,6 +3,10 @@
 import socket
 import time
 import os.path
+import struct
+import cv2
+import numpy as np
+
 
 TCP_IP = '172.20.160.24'
 TCP_PORT = 1975
@@ -11,53 +15,106 @@ BUFFER_SIZE = 1024
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect((TCP_IP, TCP_PORT))
 
-MESSAGE = "SET_API_VERSION 2\n"
-s.send(MESSAGE)
+def octosend(message, nExpected):
+    if len(message) > 0:
+        print "SENDING>>", message, "<<"
+        s.send(message)
 
-time.sleep(0.1)
+    if nExpected == 0:
+        return("")
+
+    buf = bytearray(b" " * nExpected)
+    view = memoryview(buf)
+
+    time.sleep(0.1)
+    s.recv_into(view, nExpected)
+
+    return(buf.decode("utf-8"))
+
+def octoread(nExpected):
+
+    out = ""
+    bytesRead = 0
+
+    bytesExpected = nExpected
+
+    while bytesExpected > 0:
+        data = s.recv(BUFFER_SIZE)
+        bytesRead += len(data)
+        bytesExpected -= len(data)
+
+        out += data
+
+    if bytesRead != nExpected:
+        print "ouch!"
+
+    return out
+
+
+octosend("SET_API_VERSION 2\n", 0)
 
 hologram="Z:/data/holoyurt/4Deep_Training/capn_bert_july13_4m_7us/capt_burt_jul13-0g-7us_13-Jul-2015_08-23-44-984.bmp"
 
-# try:
-#     with open(hologram) as file:
-#         pass
-# except IOError as e:
-#     print "can't find" + hologram
+nDataBytes = 0
+dataBytes = ""
 
-# if os.path.exists(hologram):
-#     print hologram + " file found!\n"
-# else:
-#     print hologram + " file not found...\n"
+outBytes =  ""
 
+def setup(hologram):
 
-MESSAGE = "RECONSTRUCT_HOLOGRAMS " + hologram + "\n0\n"
-s.send(MESSAGE)
-data = s.recv(BUFFER_SIZE)
-print "received data>>", data, "<<"
+    out = octosend("RECONSTRUCT_HOLOGRAMS " + hologram + "\n0\n", 6)
 
-time.sleep(0.1)
+    if out == "RECONS":
 
-MESSAGE = "OUTPUT_MODE 0\n0\n"
-s.send(MESSAGE)
-data = s.recv(BUFFER_SIZE)
-print "received data>>", data, "<<"
+        print "1>>>", out, "<<<"
+        out = octosend("", 20)
+        print "2>>>", out, "<<<"
 
-time.sleep(0.1)
+        out = octosend("STREAM_RECONSTRUCTION 9000\n0\n", 41)
 
-MESSAGE = "STREAM_RECONSTRUCTION 9000\n0\n"
-s.send(MESSAGE)
-data = s.recv(BUFFER_SIZE)
-print "received data>>", data, "<<"
+        nDataBytes = int(out[32:40])
+        print "N=", nDataBytes
 
-time.sleep(0.1)
+    elif out == "STREAM":
 
-data = s.recv(BUFFER_SIZE)
-print "received data>>", data, "<<"
+        print "1>>>", out, "<<<"
+        out = octosend("", 35)
+        print "2>>>", out, "<<<"
 
-time.sleep(0.1)
+        nDataBytes = int(out[26:34])
+        print "N=", nDataBytes
 
-data = s.recv(BUFFER_SIZE)
-print "received data>>", data, "<<"
+    outBytes = octoread(nDataBytes)
+
+    #print "received: ", len(outBytes), " bytes"
+
+    #outBytes = outBytes[0:-26]
+    print outBytes[-28:]
+
+    return(outBytes)
+
+outBytes = setup(hologram)
+
+outFloats = np.frombuffer(outBytes, dtype='>f4', count=-1)
+
+print outFloats[0:12]
+
+maxZ = np.max(outFloats)
+
+z = np.zeros((2048, 2048), dtype=np.dtype('b'))
+
+i = j = 0
+for k in range(z.shape[0]*z.shape[1]):
+    z[i, j] = int(255 * (outFloats[k]/maxZ))
+    i += 1
+    if i == 2048:
+        i = 0
+        j += 1
+
+cv2.imshow('image',z)
+k = cv2.waitKey(0)
+if k == 27:         # wait for ESC key to exit
+    cv2.destroyAllWindows()
 
 
 # RECONSTRUCT_HOLOGRAMS Val\n
