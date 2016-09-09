@@ -86,7 +86,10 @@ void step1() {
   }
 
 
-  if (show) cv::namedWindow("Display window", cv::WINDOW_AUTOSIZE);// Create a window for display.
+  if (show) { // Create a window for display.
+    cv::namedWindow("Display window", cv::WINDOW_NORMAL);
+    cv::resizeWindow("Display window", 500, 400);
+  }
 
   for (int output = 0; output < 3; output++){
     std::cout << "send output mode" << output << std::endl;
@@ -112,13 +115,13 @@ void step1() {
 	{
 	default:
 	case 0:
-	  name = datafolder + "//Intensity_" + std::to_string((long long int)d) + ".ext";
+	  name = datafolder + "/Intensity_" + std::to_string((long long int)d) + ".ext";
 	  break;
 	case 1:
-	  name = datafolder + "//Amplitude_" + std::to_string((long long int)d) + ".ext";
+	  name = datafolder + "/Amplitude_" + std::to_string((long long int)d) + ".ext";
 	  break;
 	case 2:
-	  name = datafolder + "//Phase_" + std::to_string((long long int)d) + ".ext";
+	  name = datafolder + "/Phase_" + std::to_string((long long int)d) + ".ext";
 	  break;
 	}
 
@@ -130,18 +133,23 @@ void step1() {
 	cv::Mat B;
 	normalize(image, image, 0, 255, CV_MINMAX);
 	image.convertTo(B, CV_8U);
-	imshow("Display window", B);
+	if ( ! B.empty ()) {
+	  imshow("Display window", B);
+	} else {
+	  std::cout << "image was somehow empty." << std::endl;
+	}
+
 	switch (output)
 	  {
 	  default:
 	  case 0:
-	    imwrite(datafolder + "//img//Intensity_" + std::to_string((long long int)d) + ".png", B);
+	    imwrite(datafolder + "/img//Intensity_" + std::to_string((long long int)d) + ".png", B);
 	    break;
 	  case 1:
-	    imwrite(datafolder + "//img//Amplitude_" + std::to_string((long long int)d) + ".png", B);
+	    imwrite(datafolder + "/img//Amplitude_" + std::to_string((long long int)d) + ".png", B);
 	    break;
 	  case 2:
-	    imwrite(datafolder + "//img//Phase_" + std::to_string((long long int)d) + ".png", B);
+	    imwrite(datafolder + "/img//Phase_" + std::to_string((long long int)d) + ".png", B);
 	    break;
 	  }
 	cv::waitKey(1);
@@ -157,3 +165,10 @@ int main(int argc, char** argv)
 }
 
 
+/* OpenCV Error: Bad flag (parameter or structure field) (Unrecognized or unsupported array type) in cvGetMat, file /gpfs/runtime/opt/opencv/2.4.0/src/OpenCV-2.4.0/modules/core/src/array.cpp, line 2482                                                                              
+terminate called after throwing an instance of 'cv::Exception'                              
+  what():  /gpfs/runtime/opt/opencv/2.4.0/src/OpenCV-2.4.0/modules/core/src/array.cpp:2482: error: (-206) Unrecognized or unsupported array type in function cvGetMat                   
+
+Aborted (core dumped)
+[tsgouros@dev09 build]$ ls data
+*/

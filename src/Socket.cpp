@@ -22,7 +22,7 @@ Socket::Socket(const std::string& serverIP, const std::string& serverPort)
 {
   _persistentBuffer = "";
 
-	printf("client: connecting...\n");
+  printf("client: connecting...\n");
 #ifdef WIN32  // WinSock implementation
 
 	WSADATA wsaData;
@@ -118,6 +118,16 @@ Socket::Socket(const std::string& serverIP, const std::string& serverPort)
 			continue;
 		}
 
+		int iTimeout = 1000;
+		struct timeval tv;
+		tv.tv_sec = 0;
+		tv.tv_usec = 30000;
+		int out = setsockopt(sockfd,
+				     SOL_SOCKET,
+				     SO_RCVTIMEO,
+				     reinterpret_cast<char*>(&tv),
+				     sizeof(timeval) );
+
 		break;
 	}
 
@@ -183,7 +193,6 @@ std::string Socket::receiveMessage(int nExpected)
     std::cout << "entering" << _persistentBuffer.length() << nExpected << std::endl;
 
     std::string reply = recvMessage();
-    std::cout << reply << std::endl;
     _persistentBuffer += recvMessage();
   }
 
@@ -204,17 +213,16 @@ std::string Socket::receiveMessage() {
 std::string Socket::recvMessage()
 {
   std::string output;
-  char buffer[1024];
+  char buffer[16384];
 
   int n;
   while ((errno = 0, (n = recv(_socketFD, buffer, sizeof(buffer), 0))>0) ||
 	 errno == EINTR) {
-    std::cout << "wow" << n<< "," << output.length() << std::endl;
     if (n > 0){
       output.append(buffer, n);
 
     } else {
-    std::cout << "wow!!!" << n<< output.length() << std::endl;
+      std::cout << "wow!!!" << n<< output.length() << std::endl;
       break;
     }
   }
@@ -249,6 +257,20 @@ cv::Mat Socket::receiveImage()
   //parse data
   std::vector<std::string> strings;
   std::string::size_type prev_pos = 0, pos = 0;
+
+  /* These really should scan the reply to see whether it can be parsed
+     this way first.  e.g. We have a reply that has the Output mode reply 
+     stuck onto the beginning of the stream reconstruction reply. 
+
+gdb) frame 8
+#8  0x0000000000408451 in Socket::receiveImage (this=0x70d300)
+    at /users/tsgouros/data/tsgouros/holoyurt/src/Socket.cpp:271
+271   int width = atoi(strings[0].substr(22, 4).c_str());
+(gdb) p reply
+$1 =
+    "OUTPUT_MODE 1\n0\nSTREAM_RECONSTRUCTION 2048 2048\n16777216\n]O\214\246]\223\036\231\\bx\376\\\255\063\255[\253\273R[\210\376T\\\354\316\252\\\227\202H\\Z\326YZ\275\221\306[\021.W\\\275\30...
+
+*/
 
   pos = reply.find('\n', pos);
   strings.push_back(reply.substr(prev_pos, pos - prev_pos));
@@ -288,3 +310,4 @@ cv::Mat Socket::receiveImage()
 
   return out_image;
 }
+
